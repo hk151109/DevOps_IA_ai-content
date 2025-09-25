@@ -1,0 +1,59 @@
+steps:
+  # Build container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA', '.']
+  # Push container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA']
+  # Get GKE credentials
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['container', 'clusters', 'get-credentials', '${_GKE_CLUSTER}', '--zone', '${_GKE_ZONE}', '--project', '$PROJECT_ID']
+  # Substitute and apply k8s manifests
+  - name: 'gcr.io/cloud-builders/kubectl'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    args:
+      - 'apply'
+      - '-f'
+      - 'k8s.yaml'
+  # Set image to the new build (manifests don't expand env vars)
+  - name: 'gcr.io/cloud-builders/kubectl'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/ai-content'
+  - 'ai-content=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA'
+  # Wait for service external IP
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'Wait for LB IP'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        for i in {1..60}; do
+          ip=$(kubectl get svc ai-content-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || true)
+          if [ -n "$ip" ]; then echo "$ip" > /workspace/AI_CONTENT_IP && echo "LB IP: $ip" && exit 0; fi
+          sleep 5
+        done
+        echo "Timed out waiting for LB IP" && exit 1
+  # Health check
+  - name: 'curlimages/curl'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        ip=$(cat /workspace/AI_CONTENT_IP)
+        curl -sf http://$ip/health
+images:
+  - 'gcr.io/$PROJECT_ID/ai-content:$COMMIT_SHA'
+substitutions:
+  _GKE_CLUSTER: devops-ia-cluster
+  _GKE_ZONE: asia-south1-a
+timeout: 1200s
