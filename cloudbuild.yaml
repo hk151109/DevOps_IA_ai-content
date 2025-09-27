@@ -1,10 +1,10 @@
 steps:
   # Build container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID', '.']
   # Push container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA']
+    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID']
   # Get GKE credentials
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['container', 'clusters', 'get-credentials', '${_GKE_CLUSTER}', '--zone', '${_GKE_ZONE}', '--project', '$PROJECT_ID']
@@ -26,7 +26,7 @@ steps:
       - 'set'
       - 'image'
       - 'deployment/ai-content'
-  - 'ai-content=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$COMMIT_SHA'
+      - 'ai-content=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID'
   # Wait for service external IP
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'Wait for LB IP'
@@ -52,7 +52,7 @@ steps:
         ip=$(cat /workspace/AI_CONTENT_IP)
         curl -sf http://$ip/health
 images:
-  - 'gcr.io/$PROJECT_ID/ai-content:$COMMIT_SHA'
+  - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID'
 substitutions:
   _GKE_CLUSTER: devops-ia-cluster
   _GKE_ZONE: asia-south1-a

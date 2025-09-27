@@ -1,5 +1,7 @@
 *.pdf
-*.txt
+# *.txt  # Commented out to allow requirements.txt
+logs/*.txt
+extracted_text/*.txt
 logs
 *.log
 npm-debug.log*
