@@ -1,15 +1,3 @@
-"""
-Minimal Flask API exposing the E5-small LoRA AI-generated detector.
-
-POST /classify
-Request: { "text": "..." }
-Response: { "ai_score": <float between 0 and 1> }
-
-This loads the model once at startup. If a local model directory exists at
-models/e5_small_lora_ai_detector, it will be used; otherwise it attempts to
-download from Hugging Face (requires internet & credentials if needed).
-"""
-
 import os
 from typing import Dict
 
