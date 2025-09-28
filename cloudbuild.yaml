@@ -1,14 +1,10 @@
 steps:
-  # Build container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID', '.']
-  # Push container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID']
-  # Get GKE credentials
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['container', 'clusters', 'get-credentials', '${_GKE_CLUSTER}', '--zone', '${_GKE_ZONE}', '--project', '$PROJECT_ID']
-  # Substitute and apply k8s manifests
   - name: 'gcr.io/cloud-builders/kubectl'
     env:
       - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
@@ -17,7 +13,6 @@ steps:
       - 'apply'
       - '-f'
       - 'k8s.yaml'
-  # Set image to the new build (manifests don't expand env vars)
   - name: 'gcr.io/cloud-builders/kubectl'
     env:
       - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
@@ -27,7 +22,6 @@ steps:
       - 'image'
       - 'deployment/ai-content'
       - 'ai-content=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID'
-  # Wait for service external IP
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'Wait for LB IP'
     env:
@@ -43,7 +37,6 @@ steps:
           sleep 5
         done
         echo "Timed out waiting for LB IP" && exit 1
-  # Health check
   - name: 'curlimages/curl'
     entrypoint: 'sh'
     args:
@@ -51,9 +44,17 @@ steps:
       - |
         ip=$(cat /workspace/AI_CONTENT_IP)
         curl -sf http://$ip/health
+
 images:
   - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/ai-content:$BUILD_ID'
+
 substitutions:
   _GKE_CLUSTER: devops-ia-cluster
   _GKE_ZONE: asia-south1-a
+
+# <-- ADD THIS OPTIONS BLOCK
+options:
+  # simplest fix: write logs to Cloud Logging only (no build-specific GCS bucket required)
+  logging: CLOUD_LOGGING_ONLY
+
 timeout: 1200s
